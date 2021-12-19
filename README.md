@@ -1,6 +1,6 @@
 # STA2101 Project
 
-We include a jupyter notebook titled STA2101_Project.ipynb includes a simplified code which minimizes the use of packages and can be run online without the need to download the data directly onto ones computer. 
+We include a jupyter notebook titled STA2101_Finalproject.ipynb includes a simplified code which minimizes the use of packages and can be run online without the need to download the data directly onto ones computer. 
 
 The processed data is included in the folder Data
 
