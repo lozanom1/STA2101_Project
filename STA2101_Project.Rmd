@@ -1,0 +1,772 @@
+---
+title: "STA2101 Final Project"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(lattice)
+library(MASS)
+library(grid)
+library(gridExtra)
+library(car)
+library(caret)
+library(GGally)
+library(corrplot)
+library(corpcor)
+library(ggfortify)
+library(mctest)
+library(ppcor)
+library(olsrr)
+library(ggiraphExtra)
+library(ggpubr)
+library(lmtest)
+```
+
+```{r load_data}
+reg1 <- read.csv('/Users/marialozano/Python/STA2101/Data/JFM_TS_VARS_R1.csv')
+reg2 <- read.csv('/Users/marialozano/Python/STA2101/Data/JFM_TS_VARS_R2.csv')
+reg3 <- read.csv('/Users/marialozano/Python/STA2101/Data/JFM_TS_VARS_R3.csv')
+reg4 <- read.csv('/Users/marialozano/Python/STA2101/Data/JFM_TS_VARS_R4.csv')
+reg5 <- read.csv('/Users/marialozano/Python/STA2101/Data/JFM_TS_VARS_R5.csv')
+```
+We begin by standardizing the data. Since our variables are measured in different units, in order to make meaningful comparisons on the impact of explanatory variables on the outcome/dependent variable, we must remove the dependence on units through standardization. In this way, all variables have mean zero and a standard deviation of 1 
+```{r preprocess_data}
+preproc1 <- preProcess(reg1[3:10], method=c("center", "scale"))
+reg1_norm <- predict(preproc1,reg1[3:10])
+reg1_norm["yrs"]<-reg1$yrs
+reg1_norm <- subset(reg1_norm, select=-c(sic))
+preproc2 <- preProcess(reg2[3:10], method=c("center", "scale"))
+reg2_norm <- predict(preproc2,reg2[3:10])
+reg2_norm["yrs"]<-reg2$yrs
+reg2_norm <- subset(reg2_norm, select=-c(sic))
+preproc3 <- preProcess(reg3[3:10], method=c("center", "scale"))
+reg3_norm <- predict(preproc3,reg3[3:10])
+reg3_norm["yrs"]<-reg3$yrs
+reg3_norm <- subset(reg3_norm, select=-c(sic))
+preproc4 <- preProcess(reg4[3:10], method=c("center", "scale"))
+reg4_norm <- predict(preproc4,reg4[3:10])
+reg4_norm["yrs"]<-reg4$yrs
+reg4_norm <- subset(reg4_norm, select=-c(sic))
+preproc5 <- preProcess(reg5[3:10], method=c("center", "scale"))
+reg5_norm <- predict(preproc5,reg5[3:10])
+reg5_norm["yrs"]<-reg5$yrs
+reg5_norm <- subset(reg5_norm, select=-c(sic))
+print("Summary for Standardized Region 1 Data")
+summary(reg1_norm)
+print("Summary for Standardized Region 2 Data")
+summary(reg2_norm)
+print("Summary for Standardized Region 3 Data")
+summary(reg3_norm)
+print("Summary for Standardized Region 4 Data")
+summary(reg4_norm)
+print("Summary for Standardized Region 5 Data")
+summary(reg5_norm)
+```
+Since we have constructed the data, we know there are no missing values, so no further work needs to be done to investigate whether there are errors.
+```{r varplts}
+plot(density(reg1_norm$sit), col="red", main="Normalized and Centered Variable Distribution", xlim = c(-5,5),ylim=c(0,0.6),ylab="Density",xlab="x", lwd=2)
+lines(density(reg1_norm$sia), col="blue", lwd=2)
+lines(density(reg1_norm$sig), col="chartreuse", lwd=2)
+lines(density(reg1_norm$sat), col="orange", lwd=2)
+lines(density(reg1_norm$slp), col="cyan", lwd=2)
+lines(density(reg1_norm$u10), col="deeppink", lwd=2)
+lines(density(reg1_norm$v10), col="darkorchid", lwd=2)
+abline(v=0, col="black", lwd=1, lty=2)
+legend("topleft", c("sit","sia","sig","sat","slp","u10","v10"), fill=c("red","blue","chartreuse","orange","cyan","deeppink","darkorchid"))
+
+plot(sort(reg1_norm$sit),lwd=2.5, col="red", main="Sorted Data", ylab="data")
+points(sort(reg1_norm$sia),lwd=2.5, col="blue")
+points(sort(reg1_norm$sig),lwd=2.5, col="chartreuse")
+points(sort(reg1_norm$sat),lwd=2.5, col="orange")
+points(sort(reg1_norm$slp),lwd=2.5, col="cyan")
+points(sort(reg1_norm$u10),lwd=2.5, col="deeppink")
+points(sort(reg1_norm$v10),lwd=2.5, col="darkorchid")
+legend("topleft", c("sit","sia","sig","sat","slp","u10","v10"), fill=c("red","blue","chartreuse","orange","cyan","deeppink","darkorchid"))
+```
+```{r boxplots_reg1}
+bsit <- ggplot(reg1_norm, aes(y=sit))+geom_boxplot(fill="darkseagreen4")
+bsia <- ggplot(reg1_norm, aes(y=sia))+geom_boxplot(fill="darkseagreen4")
+bsig <- ggplot(reg1_norm, aes(y=sig))+geom_boxplot(fill="darkseagreen4")
+bsat <- ggplot(reg1_norm, aes(y=sat))+geom_boxplot(fill="darkseagreen4")
+bslp <- ggplot(reg1_norm, aes(y=slp))+geom_boxplot(fill="darkseagreen4")
+bu10 <- ggplot(reg1_norm, aes(y=u10))+geom_boxplot(fill="darkseagreen4")
+bv10 <- ggplot(reg1_norm, aes(y=v10))+geom_boxplot(fill="darkseagreen4")
+figure <- ggarrange(bsit,bsia,bsig,bsat,bslp,bu10,bv10, labels=c("a","b","c", "d", "e","f","g"),ncol=4,nrow=2)
+annotate_figure(figure, top=text_grob("Region 1 Variable Boxplots", face="bold", size=14))
+
+ssit <- ggplot(reg1_norm, aes(yrs,sit))+geom_point(color="firebrick")+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+ssia <- ggplot(reg1_norm, aes(yrs,sia))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssig <- ggplot(reg1_norm, aes(yrs,sig))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssat <- ggplot(reg1_norm, aes(yrs,sat))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sslp <- ggplot(reg1_norm, aes(yrs,slp))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+su10 <- ggplot(reg1_norm, aes(yrs,u10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sv10 <- ggplot(reg1_norm, aes(yrs,v10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+scat_fig <- ggarrange(ssit,ssia,ssig,ssat,sslp,su10,sv10, labels=c("a","b","c", "d", "e","f","g"),ncol=4,nrow=2)
+annotate_figure(scat_fig, top=text_grob("Region 1 Variable Scatterplots", face="bold", size=14))
+
+ggcorr(reg1_norm[2:7])+labs(title="Independent Variable Correlation - Region 1")
+```
+From the boxplots we notice that there are some outliers; however, based on the scatterplots, there are no points that we can remove without affecting the trend in the data. The correlation matrix, on the other hand, highlights that the independent variables are correlated indicating that we may face issues with multicollinearity of the explanatory variables. This is not unexpected as all environmental variables are to some extent related. 
+```{r boxplots_reg2}
+bsit <- ggplot(reg2_norm, aes(y=sit))+geom_boxplot(fill="darkseagreen4")
+bsia <- ggplot(reg2_norm, aes(y=sia))+geom_boxplot(fill="darkseagreen4")
+bsig <- ggplot(reg2_norm, aes(y=sig))+geom_boxplot(fill="darkseagreen4")
+bsat <- ggplot(reg2_norm, aes(y=sat))+geom_boxplot(fill="darkseagreen4")
+bslp <- ggplot(reg2_norm, aes(y=slp))+geom_boxplot(fill="darkseagreen4")
+bu10 <- ggplot(reg2_norm, aes(y=u10))+geom_boxplot(fill="darkseagreen4")
+bv10 <- ggplot(reg2_norm, aes(y=v10))+geom_boxplot(fill="darkseagreen4")
+figure <- ggarrange(bsit,bsia,bsig,bsat,bslp,bu10,bv10, labels=c("a","b","c", "d", "e","f","g"),ncol=4,nrow=2)
+annotate_figure(figure, top=text_grob("Region 2 Variable Boxplots", face="bold", size=14))
+
+ssit <- ggplot(reg2_norm, aes(yrs,sit))+geom_point(color="firebrick")+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+ssia <- ggplot(reg2_norm, aes(yrs,sia))+geom_point(color="firebrick")+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+ssig <- ggplot(reg2_norm, aes(yrs,sig))+geom_point(color="firebrick")+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+ssat <- ggplot(reg2_norm, aes(yrs,sat))+geom_point(color="firebrick")+stat_smooth(method="lm", se=TRUE)+stat_cor()
+sslp <- ggplot(reg2_norm, aes(yrs,slp))+geom_point(color="firebrick")+stat_smooth(method="lm", se=TRUE)+stat_cor()
+su10 <- ggplot(reg2_norm, aes(yrs,u10))+geom_point(color="firebrick")+stat_smooth(method="lm", se=TRUE)+stat_cor()
+sv10 <- ggplot(reg2_norm, aes(yrs,v10))+geom_point(color="firebrick")+stat_smooth(method="lm", se=TRUE)+stat_cor()
+scat_fig <- ggarrange(ssit,ssia,ssig,ssat,sslp,su10,sv10, labels=c("a","b","c", "d", "e","f","g"),ncol=3,nrow=3)
+annotate_figure(scat_fig, top=text_grob("Region 1 Variable Scatterplots", face="bold", size=14))
+
+ggcorr(reg2_norm[2:7])+labs(title="Independent Variable Correlation - Region 2")
+```
+
+```{r boxplots_reg3}
+bsit <- ggplot(reg3_norm, aes(y=sit))+geom_boxplot(fill="darkseagreen4")
+bsia <- ggplot(reg3_norm, aes(y=sia))+geom_boxplot(fill="darkseagreen4")
+bsig <- ggplot(reg3_norm, aes(y=sig))+geom_boxplot(fill="darkseagreen4")
+bsat <- ggplot(reg3_norm, aes(y=sat))+geom_boxplot(fill="darkseagreen4")
+bslp <- ggplot(reg3_norm, aes(y=slp))+geom_boxplot(fill="darkseagreen4")
+bu10 <- ggplot(reg3_norm, aes(y=u10))+geom_boxplot(fill="darkseagreen4")
+bv10 <- ggplot(reg3_norm, aes(y=v10))+geom_boxplot(fill="darkseagreen4")
+figure <- ggarrange(bsit,bsia,bsig,bsat,bslp,bu10,bv10, labels=c("a","b","c", "d", "e","f","g"),ncol=4,nrow=2)
+annotate_figure(figure, top=text_grob("Region 3 Variable Boxplots", face="bold", size=14))
+
+ssit <- ggplot(reg3_norm, aes(yrs,sit))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssia <- ggplot(reg3_norm, aes(yrs,sia))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssig <- ggplot(reg3_norm, aes(yrs,sig))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssat <- ggplot(reg3_norm, aes(yrs,sat))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sslp <- ggplot(reg3_norm, aes(yrs,slp))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+su10 <- ggplot(reg3_norm, aes(yrs,u10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sv10 <- ggplot(reg3_norm, aes(yrs,v10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+scat_fig <- ggarrange(ssit,ssia,ssig,ssat,sslp,su10,sv10, labels=c("a","b","c", "d", "e","f","g"),ncol=3,nrow=3)
+annotate_figure(scat_fig, top=text_grob("Region 3 Variable Scatterplots", face="bold", size=14))
+
+ggcorr(reg3_norm[2:7])+labs(title="Independent Variable Correlation - Region 3")
+```
+```{r boxplots_reg4}
+bsit <- ggplot(reg4_norm, aes(y=sit))+geom_boxplot(fill="darkseagreen4")
+bsia <- ggplot(reg4_norm, aes(y=sia))+geom_boxplot(fill="darkseagreen4")
+bsig <- ggplot(reg4_norm, aes(y=sig))+geom_boxplot(fill="darkseagreen4")
+bsat <- ggplot(reg4_norm, aes(y=sat))+geom_boxplot(fill="darkseagreen4")
+bslp <- ggplot(reg4_norm, aes(y=slp))+geom_boxplot(fill="darkseagreen4")
+bu10 <- ggplot(reg4_norm, aes(y=u10))+geom_boxplot(fill="darkseagreen4")
+bv10 <- ggplot(reg4_norm, aes(y=v10))+geom_boxplot(fill="darkseagreen4")
+figure <- ggarrange(bsit,bsia,bsig,bsat,bslp,bu10,bv10, labels=c("a","b","c", "d", "e","f","g"),ncol=4,nrow=2)
+annotate_figure(figure, top=text_grob("Region 4 Variable Boxplots", face="bold", size=14))
+
+ssit <- ggplot(reg4_norm, aes(yrs,sit))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssia <- ggplot(reg4_norm, aes(yrs,sia))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssig <- ggplot(reg4_norm, aes(yrs,sig))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssat <- ggplot(reg4_norm, aes(yrs,sat))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sslp <- ggplot(reg4_norm, aes(yrs,slp))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+su10 <- ggplot(reg4_norm, aes(yrs,u10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sv10 <- ggplot(reg4_norm, aes(yrs,v10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssit 
+ssia 
+ssig 
+ssat 
+sslp 
+su10 
+sv10 
+scat_fig <- ggarrange(ssit,ssia,ssig,ssat,sslp,su10,sv10, labels=c("a","b","c", "d", "e","f","g"),ncol=3,nrow=3)
+annotate_figure(scat_fig, top=text_grob("Region 4 Variable Scatterplots", face="bold", size=14))
+
+ggcorr(reg4_norm[2:7])+labs(title="Independent Variable Correlation - Region 4")
+```
+
+```{r boxplots_reg5}
+bsit <- ggplot(reg5_norm, aes(y=sit))+geom_boxplot(fill="darkseagreen4")
+bsia <- ggplot(reg5_norm, aes(y=sia))+geom_boxplot(fill="darkseagreen4")
+bsig <- ggplot(reg5_norm, aes(y=sig))+geom_boxplot(fill="darkseagreen4")
+bsat <- ggplot(reg5_norm, aes(y=sat))+geom_boxplot(fill="darkseagreen4")
+bslp <- ggplot(reg5_norm, aes(y=slp))+geom_boxplot(fill="darkseagreen4")
+bu10 <- ggplot(reg5_norm, aes(y=u10))+geom_boxplot(fill="darkseagreen4")
+bv10 <- ggplot(reg5_norm, aes(y=v10))+geom_boxplot(fill="darkseagreen4")
+figure <- ggarrange(bsit,bsia,bsig,bsat,bslp,bu10,bv10, labels=c("a","b","c", "d", "e","f","g"),ncol=4,nrow=2)
+annotate_figure(figure, top=text_grob("Region 5 Variable Boxplots", face="bold", size=14))
+
+ssit <- ggplot(reg5_norm, aes(yrs,sit))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssia <- ggplot(reg5_norm, aes(yrs,sia))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssig <- ggplot(reg5_norm, aes(yrs,sig))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+ssat <- ggplot(reg5_norm, aes(yrs,sat))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sslp <- ggplot(reg5_norm, aes(yrs,slp))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+su10 <- ggplot(reg5_norm, aes(yrs,u10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+sv10 <- ggplot(reg5_norm, aes(yrs,v10))+geom_point(color="firebrick")+stat_smooth(method="lm",se=TRUE)+stat_cor()
+scat_fig <- ggarrange(ssit,ssia,ssig,ssat,sslp,su10,sv10, labels=c("a","b","c", "d", "e","f","g"),ncol=3,nrow=3)
+annotate_figure(scat_fig, top=text_grob("Region 5 Variable Scatterplots", face="bold", size=14))
+
+ggcorr(reg5_norm[2:7])+labs(title="Independent Variable Correlation - Region 5")
+```
+We notice that the explanatory variables for different regions experience different degrees of correlation and are correlated to different variables. This is expected as we expect the behaviour over different regions to differ. For this reason, the regions were split up. 
+
+```{r moreplots1}
+multivar1 <- ggplot(reg1_norm, aes(sia,sit))+geom_point(color="firebrick")+labs(x="sia", y="sit", title= "Sea-Ice Advection vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar2 <- ggplot(reg1_norm, aes(sig,sit))+geom_point(color="firebrick")+labs(x="sig", y="sit", title= "Sea-Ice Growth vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar3 <- ggplot(reg1_norm, aes(sat,sit))+geom_point(color="firebrick")+labs(x="sat", y="sit", title= "Surface Air Temperature vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar4 <- ggplot(reg1_norm, aes(slp,sit))+geom_point(color="firebrick")+labs(x="slp", y="sit", title= "Sea-Level Pressure vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar5 <- ggplot(reg1_norm, aes(u10,sit))+geom_point(color="firebrick")+labs(x="u10", y="sit", title= "Zonal Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar6 <- ggplot(reg1_norm, aes(v10,sit))+geom_point(color="firebrick")+labs(x="v10", y="sit", title= "Meridional Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar_fig <- ggarrange(multivar1,multivar2,multivar3,multivar4,multivar5,multivar6,multivar7, labels=c("a","b","c", "d", "e","f","g"),ncol=2,nrow=4)
+annotate_figure(multivar_fig, top=text_grob("Region 1 Var vs. SIT Relationships", face="bold", size=14))
+```
+```{r moreplots2}
+multivar1 <- ggplot(reg2_norm, aes(sia,sit))+geom_point(color="firebrick")+labs(x="sia", y="sit", title= "Sea-Ice Advection vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar2 <- ggplot(reg2_norm, aes(sig,sit))+geom_point(color="firebrick")+labs(x="sig", y="sit", title= "Sea-Ice Growth vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar3 <- ggplot(reg2_norm, aes(sat,sit))+geom_point(color="firebrick")+labs(x="sat", y="sit", title= "Surface Air Temperature vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar4 <- ggplot(reg2_norm, aes(slp,sit))+geom_point(color="firebrick")+labs(x="slp", y="sit", title= "Sea-Level Pressure vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar5 <- ggplot(reg2_norm, aes(u10,sit))+geom_point(color="firebrick")+labs(x="u10", y="sit", title= "Zonal Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar6 <- ggplot(reg2_norm, aes(v10,sit))+geom_point(color="firebrick")+labs(x="v10", y="sit", title= "Meridional Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar_fig <- ggarrange(multivar1,multivar2,multivar3,multivar4,multivar5,multivar6,multivar7, labels=c("a","b","c", "d", "e","f","g"),ncol=2,nrow=4)
+annotate_figure(multivar_fig, top=text_grob("Region 1 Var vs. SIT Relationships", face="bold", size=14))
+```
+
+```{r moreplots3}
+multivar1 <- ggplot(reg3_norm, aes(sia,sit))+geom_point(color="firebrick")+labs(x="sia", y="sit", title= "Sea-Ice Advection vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar2 <- ggplot(reg3_norm, aes(sig,sit))+geom_point(color="firebrick")+labs(x="sig", y="sit", title= "Sea-Ice Growth vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar3 <- ggplot(reg3_norm, aes(sat,sit))+geom_point(color="firebrick")+labs(x="sat", y="sit", title= "Surface Air Temperature vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar4 <- ggplot(reg3_norm, aes(slp,sit))+geom_point(color="firebrick")+labs(x="slp", y="sit", title= "Sea-Level Pressure vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar5 <- ggplot(reg3_norm, aes(u10,sit))+geom_point(color="firebrick")+labs(x="u10", y="sit", title= "Zonal Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar6 <- ggplot(reg3_norm, aes(v10,sit))+geom_point(color="firebrick")+labs(x="v10", y="sit", title= "Meridional Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar_fig <- ggarrange(multivar1,multivar2,multivar3,multivar4,multivar5,multivar6,multivar7, labels=c("a","b","c", "d", "e","f","g"),ncol=2,nrow=4)
+annotate_figure(multivar_fig, top=text_grob("Region 1 Var vs. SIT Relationships", face="bold", size=14))
+```
+
+```{r moreplots4}
+multivar1 <- ggplot(reg4_norm, aes(sia,sit))+geom_point(color="firebrick")+labs(x="sia", y="sit", title= "Sea-Ice Advection vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar2 <- ggplot(reg4_norm, aes(sig,sit))+geom_point(color="firebrick")+labs(x="sig", y="sit", title= "Sea-Ice Growth vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar3 <- ggplot(reg4_norm, aes(sat,sit))+geom_point(color="firebrick")+labs(x="sat", y="sit", title= "Surface Air Temperature vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar4 <- ggplot(reg4_norm, aes(slp,sit))+geom_point(color="firebrick")+labs(x="slp", y="sit", title= "Sea-Level Pressure vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar5 <- ggplot(reg4_norm, aes(u10,sit))+geom_point(color="firebrick")+labs(x="u10", y="sit", title= "Zonal Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar6 <- ggplot(reg4_norm, aes(v10,sit))+geom_point(color="firebrick")+labs(x="v10", y="sit", title= "Meridional Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar_fig <- ggarrange(multivar1,multivar2,multivar3,multivar4,multivar5,multivar6,multivar7, labels=c("a","b","c", "d", "e","f","g"),ncol=2,nrow=4)
+annotate_figure(multivar_fig, top=text_grob("Region 1 Var vs. SIT Relationships", face="bold", size=14))
+```
+
+```{r moreplots5}
+multivar1 <- ggplot(reg5_norm, aes(sia,sit))+geom_point(color="firebrick")+labs(x="sia", y="sit", title= "Sea-Ice Advection vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar2 <- ggplot(reg5_norm, aes(sig,sit))+geom_point(color="firebrick")+labs(x="sig", y="sit", title= "Sea-Ice Growth vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar3 <- ggplot(reg5_norm, aes(sat,sit))+geom_point(color="firebrick")+labs(x="sat", y="sit", title= "Surface Air Temperature vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar4 <- ggplot(reg5_norm, aes(slp,sit))+geom_point(color="firebrick")+labs(x="slp", y="sit", title= "Sea-Level Pressure vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar5 <- ggplot(reg5_norm, aes(u10,sit))+geom_point(color="firebrick")+labs(x="u10", y="sit", title= "Zonal Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar6 <- ggplot(reg5_norm, aes(v10,sit))+geom_point(color="firebrick")+labs(x="v10", y="sit", title= "Meridional Wind vs. Sea-Ice Thickness")+coord_equal()+stat_smooth(method = "lm", se=TRUE)+stat_cor()
+multivar_fig <- ggarrange(multivar1,multivar2,multivar3,multivar4,multivar5,multivar6,multivar7, labels=c("a","b","c", "d", "e","f","g"),ncol=2,nrow=4)
+annotate_figure(multivar_fig, top=text_grob("Region 1 Var vs. SIT Relationships", face="bold", size=14))
+```
+
+```{r lm1_reg1}
+fit1_prelim <- lm(sit~sia + sig + sat + slp + u10 + v10, data=reg1_norm)
+summary(fit1_prelim)
+#par(mfrow=c(2,2))
+#plot(fit1_prelim)
+qqPlot(fit1_prelim$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(fit1_prelim)
+shapiro.test(fit1_prelim$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(fit1_prelim)
+# Test heterostescadisity 
+ols_test_breusch_pagan(fit1_prelim)
+# Test for multicollinearity
+car::vif(fit4_prelim)
+#Plots
+ols_plot_resid_fit(fit1_prelim)
+ols_plot_resid_stand(fit1_prelim)
+ols_plot_resid_lev(fit1_prelim)
+```
+From the standardized residuals plot indicates that 14 is likely an outlier. This observation corresponds to the year of 2001. Basically, we expect 95% of the standardized residuals to be within 2 standard deviations from the mean. Observations outside of this range are unusual and likely outliers. The Outlier and Leverage plot on the other hand helps us identify outliers and influential observations here corresponding to observations 12 (1999), 14(2001) outliers and 24 (2011) high leverage. Outliers do not fit model well.
+
+```{r lm1_reg2}
+fit2_prelim <- lm(sit~sia + sig + sat + slp + u10 + v10, data=reg2_norm)
+summary(fit2_prelim)
+qqPlot(fit2_prelim$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(fit2_prelim)
+shapiro.test(fit2_prelim$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(fit2_prelim)
+# Test heterostescadisity 
+ols_test_breusch_pagan(fit2_prelim)
+# Test for multicollinearity
+car::vif(fit2_prelim)
+#Plots
+ols_plot_resid_fit(fit2_prelim)
+ols_plot_resid_stand(fit2_prelim)
+ols_plot_resid_lev(fit2_prelim)
+```
+Residuals normally distributed but variance is not constant
+
+```{r lm1_reg3}
+fit3_prelim <- lm(sit~sia + sig + sat + slp + u10 + v10, data=reg3_norm)
+summary(fit3_prelim)
+qqPlot(fit3_prelim$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.2,2.2), main="Normal Q-Q Plot")
+ols_plot_resid_hist(fit3_prelim)
+shapiro.test(fit3_prelim$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(fit3_prelim)
+# Test heterostescadisity 
+ols_test_breusch_pagan(fit3_prelim)
+# Test for multicollinearity
+car::vif(fit3_prelim)
+#Plots
+ols_plot_resid_fit(fit3_prelim)
+ols_plot_resid_stand(fit3_prelim)
+ols_plot_resid_lev(fit3_prelim)
+```
+For the normality test we find a p-value of 0.07. If we want a 95% confidence interval, we do not find a statisticaly significant p-value and the null hypothesis that the data is normally distributed cannot be rejected. However, if we want a confidence interval of 90%, we do have a statistically significant p-value of 0.07<0.1 which means the null hypothesis is rejected and we cannot assure that the data is normally distributed. The null hypothesis that variance is constant is not rejected.
+```{r lm1_reg4}
+fit4_prelim <- lm(sit~sia + sig + sat + slp + u10 + v10, data=reg4_norm)
+summary(fit4_prelim)
+#par(mfrow=c(2,2))
+#plot(fit1_prelim)
+qqPlot(fit4_prelim$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2,2), main="Normal Q-Q Plot")
+ols_plot_resid_hist(fit4_prelim)
+shapiro.test(fit4_prelim$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(fit4_prelim)
+# Test heterostescadisity 
+ols_test_breusch_pagan(fit4_prelim)
+# Test for multicollinearity
+car::vif(fit4_prelim)
+#Plots
+ols_plot_resid_fit(fit4_prelim)
+ols_plot_resid_stand(fit4_prelim)
+ols_plot_resid_lev(fit4_prelim)
+```
+The null hypothesis that the data is normally distributed is not rejected, but the null hypothesis that the variance is constant is rejected for the 95% confidence interval. 
+```{r lm1_reg5}
+fit5_prelim <- lm(sit~sia + sig + sat + slp + u10 + v10, data=reg5_norm)
+summary(fit5_prelim)
+#par(mfrow=c(2,2))
+#plot(fit1_prelim)
+qqPlot(fit5_prelim$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1,1), main="Normal Q-Q Plot")
+ols_plot_resid_hist(fit5_prelim)
+shapiro.test(fit5_prelim$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(fit5_prelim)
+# Test heterostescadisity 
+ols_test_breusch_pagan(fit5_prelim)
+# Test for multicollinearity
+car::vif(fit5_prelim)
+#Plots
+ols_plot_resid_fit(fit5_prelim)
+ols_plot_resid_stand(fit5_prelim)
+ols_plot_resid_lev(fit5_prelim)
+```
+The null hypothesis that the data is normally distributed is not rejected. The null hypothesis that the variance is constant is rejected since we find a significant p-value for the 95% confidence interval. 
+
+So all in all we have found that the preliminary linear models for the regions experience heteroskedasticity in the case of Region 2, 4 and 5 and non-normality in the case of region 3.
+
+Before dealing with these issues, we first want to deal with the multicollinearity. We expect some variables to be highly correlated which will lead to the removal of such variables. In this removal, we may remove problematic variables from the analysis.
+```{r multicollinearity1}
+omcdiag(fit1_prelim)
+imcdiag(fit1_prelim)
+fit1_prelim2 <- lm(sit~sia + sig + slp + u10 +v10 , data=reg1_norm)
+omcdiag(fit1_prelim2)
+imcdiag(fit1_prelim2)
+fit1_prelim3 <- lm(sit~sig  + slp + u10 +v10 , data=reg1_norm)
+omcdiag(fit1_prelim3)
+imcdiag(fit1_prelim3)
+final_fit1 <- fit1_prelim3
+```
+Usually, a VIF cut-off value of 10 or 5 is used. However here, collinearity is detected despite none of the variables exceeding the VIF cutoff. So, we remove the variables with the highest VIF score until collinearity is no longer detected. Another way of interpreting this is that Wi provides the Farrar Glauber F-test. The theoretical f-value for the full model with k=7,n=29 (k-1,n-k)=(5,24) = 2.62, (4,25)=2.76 at 5% significance level.
+
+```{r multicollinearity2}
+omcdiag(fit2_prelim)
+imcdiag(fit2_prelim)
+fit2_prelim2 <- lm(sit~sat+sig+slp+u10+v10, data=reg2_norm)
+omcdiag(fit2_prelim2)
+imcdiag(fit2_prelim2)
+fit2_prelim3 <- lm(sit~sat+sig+slp+u10, data=reg2_norm)
+omcdiag(fit2_prelim3)
+imcdiag(fit2_prelim3)
+fit2_prelim4 <- lm(sit~slp+u10+sat, data=reg2_norm)
+omcdiag(fit2_prelim4)
+imcdiag(fit2_prelim4)
+final_fit2 <- fit2_prelim4
+```
+(5,24) = 2.62, (4,25)=2.76, (3,26)=2.98
+```{r multicollinearity3}
+omcdiag(fit3_prelim)
+imcdiag(fit3_prelim)
+fit3_prelim2 <- lm(sit~sia+sig+sat+u10+v10, data=reg3_norm)
+omcdiag(fit3_prelim2)
+imcdiag(fit3_prelim2)
+fit3_prelim3 <- lm(sit~sig+sat+u10+v10, data=reg3_norm)
+omcdiag(fit3_prelim3)
+imcdiag(fit3_prelim3)
+final_fit3 <- fit3_prelim3
+```
+(5,24) = 2.62, (4,25)=2.76
+```{r multicollinearity4}
+omcdiag(fit4_prelim)
+imcdiag(fit4_prelim)
+fit4_prelim2 <- lm(sit~sia+sig+sat+slp+v10, data=reg4_norm)
+omcdiag(fit4_prelim2)
+imcdiag(fit4_prelim2)
+fit4_prelim3 <- lm(sit~sia+sig+sat+slp, data=reg4_norm)
+omcdiag(fit4_prelim3)
+imcdiag(fit4_prelim3)
+fit4_prelim4 <- lm(sit~sia+sat+slp, data=reg4_norm)
+omcdiag(fit4_prelim4)
+imcdiag(fit4_prelim4)
+final_fit4 <- fit4_prelim4
+```
+(6,22) is 2.55, (5,24) = 2.62, (4,25)=2.76, (3,26)=2.98
+```{r multicollinearity5}
+omcdiag(fit5_prelim)
+imcdiag(fit5_prelim)
+fit5_prelim2 <- lm(sit~sia+sig+sat+slp+v10, data=reg5_norm)
+omcdiag(fit5_prelim2)
+imcdiag(fit5_prelim2)
+fit5_prelim3 <- lm(sit~sia+sat+slp+v10, data=reg5_norm)
+omcdiag(fit5_prelim3)
+imcdiag(fit5_prelim3)
+fit5_prelim4 <- lm(sit~sia+sat+slp, data=reg5_norm)
+omcdiag(fit5_prelim4)
+imcdiag(fit5_prelim4)
+final_fit5 <- fit5_prelim4
+```
+(6,22) is 2.55, (5,24) = 2.62, (4,25)=2.76, (3,26)=2.98
+
+```{r prelimlmsumm}
+summary(final_fit1)
+qqPlot(final_fit1$resid, ylab="Residuals", xlab="Theoretical Quantiles",ylim=c(-3,3))
+summary(final_fit2)
+qqPlot(final_fit2$resid, ylab="Residuals", xlab="Theoretical Quantiles",ylim=c(-2.5,2.5))
+summary(final_fit3)
+qqPlot(final_fit3$resid, ylab="Residuals", xlab="Theoretical Quantiles",ylim=c(-2.5,2.5))
+summary(final_fit4)
+qqPlot(final_fit4$resid, ylab="Residuals", xlab="Theoretical Quantiles",ylim=c(-2.5,2.5))
+summary(final_fit5)
+qqPlot(final_fit5$resid, ylab="Residuals", xlab="Theoretical Quantiles",ylim=c(-2.5,2.5))
+
+```
+
+```{r selectvars1}
+selectMod1 <- step(final_fit1)
+summary(selectMod1)
+```
+```{r selectvars2}
+selectMod2 <- step(final_fit2)
+summary(selectMod2)
+```
+```{r selectvars3}
+selectMod3 <- step(final_fit3)
+summary(selectMod3)
+```
+```{r selectvars4}
+selectMod4 <- step(final_fit4)
+summary(selectMod4)
+```
+```{r selectvars5}
+selectMod5 <- step(final_fit5)
+summary(selectMod5)
+```
+
+
+```{r finalmod1}
+#F statistic p-value: highly significant indicates that at least one of the predictor variables is highly correlated to the outcome variable.
+#t-statistic: evaluates if there is significant association between the predictor and outcome variable i.e. whether the beta coefficient of the predictor is significantly different from zero. All of them significant
+
+#Model: sit = -5.675e-16 -3.495e-01*sia - 7.664e-01*sat + 4.191e-01*u10
+#R2: correlation coefficient between observed values of the outcome variable (y) and the fitted (i.e., predicted) values of y.
+#The RSE estimate gives a measure of error of prediction.
+summary(selectMod1)
+qqPlot(selectMod1$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(selectMod1)
+shapiro.test(selectMod1$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(selectMod1)
+# Test heterostescadisity 
+ols_test_breusch_pagan(selectMod1)
+#Plots
+ols_plot_resid_fit(selectMod1)
+ols_plot_resid_stand(selectMod1)
+ols_plot_resid_lev(selectMod1)
+
+```
+Tests not significant, fail to reject null. Variance is homogeneous and data is normally distributed
+
+```{r finalmod2}
+summary(selectMod2)
+qqPlot(selectMod2$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(selectMod2)
+shapiro.test(selectMod2$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(selectMod2)
+# Test heterostescadisity 
+ols_test_breusch_pagan(selectMod2)
+#Plots
+ols_plot_resid_fit(selectMod2)
+ols_plot_resid_stand(selectMod2)
+ols_plot_resid_lev(selectMod2)
+```
+The data is not normal and variance is not constant
+
+```{r finalmod3}
+summary(selectMod3)
+qqPlot(selectMod3$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(selectMod3)
+shapiro.test(selectMod3$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(selectMod3)
+# Test heterostescadisity 
+ols_test_breusch_pagan(selectMod3)
+#Plots
+ols_plot_resid_fit(selectMod3)
+ols_plot_resid_stand(selectMod3)
+ols_plot_resid_lev(selectMod3)
+```
+```{r finalmod4}
+summary(selectMod4)
+qqPlot(selectMod4$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(selectMod4)
+shapiro.test(selectMod4$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(selectMod4)
+# Test heterostescadisity 
+ols_test_breusch_pagan(selectMod4)
+#Plots
+ols_plot_resid_fit(selectMod4)
+ols_plot_resid_stand(selectMod4)
+ols_plot_resid_lev(selectMod4)
+```
+Data normally distributed, variance not constant
+```{r finalmod5}
+summary(selectMod5)
+qqPlot(selectMod5$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(selectMod5)
+shapiro.test(selectMod5$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(selectMod5)
+# Test heterostescadisity 
+ols_test_breusch_pagan(selectMod5)
+#Plots
+ols_plot_resid_fit(selectMod5)
+ols_plot_resid_stand(selectMod5)
+ols_plot_resid_lev(selectMod5)
+
+```
+Overall, these models all perform poorly in modeling the explanatory variable, sea-ice thickness. We suspect that the models are too simple and include too few variables. We will return to the step where we treat multicollinearity and apply a less strict condition on the collinearity. We will also use physical intuition in combination with the statistical results to remove variables. We will use the conservative cut-off value of VIF of 2.5 which is suggested to be a conservative tolerable value of VIF.
+
+```{r mclin1}
+fit1_prelim <- lm(sit~.-yrs, data=reg1_norm)
+omcdiag(fit1_prelim)
+imcdiag(fit1_prelim)
+fit1_prelim2 <- lm(sit~sia + sig + sat+ slp + u10  , data=reg1_norm)
+omcdiag(fit1_prelim2)
+imcdiag(fit1_prelim2)
+fin_fit1 <- lm(sit~ sia + sig + sat + slp +u10 + sia*sig +sia:sat + sia:slp +sia:u10 +sig:sat+sig:slp+sig:u10+sat:slp+sat:u10+slp:u10, data=reg1_norm)
+Mod1 <- step(fin_fit1)
+summary(Mod1)
+
+#test for normality
+shapiro.test(Mod1$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod1)
+#test for heteroskedasticity
+bptest(Mod1)
+#Plots
+qqPlot(Mod1$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1,1), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod1)
+ols_plot_resid_fit(Mod1)
+ols_plot_resid_stand(Mod1)
+ols_plot_resid_lev(Mod1)
+
+Mod1_final <- lm(sit~ sia + sig + sat + u10 + sia:u10 + sia:u10 + sat:slp, data=reg1_norm)
+Mod1_final <- lm(sit~ sia + sat + u10, data=reg1_norm)
+summary(Mod1_final)
+#test for normality
+shapiro.test(Mod1_final$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod1_final)
+#test for heteroskedasticity
+bptest(Mod1_final)
+#Plots
+qqPlot(Mod1_final$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod1_final)
+ols_plot_resid_fit(Mod1_final)
+ols_plot_resid_stand(Mod1_final)
+ols_plot_resid_lev(Mod1_final)
+```
+```{r mclin2}
+fit2_prelim <- lm(sit~.-yrs, data=reg2_norm)
+omcdiag(fit2_prelim)
+imcdiag(fit2_prelim)
+fit2_prelim2 <- lm(sit~ sia + sig + sat+ slp + v10 , data=reg2_norm)
+omcdiag(fit2_prelim2)
+imcdiag(fit2_prelim2)
+fin_fit2 <- lm(sit ~ sia + sig + sat + slp + v10 + sia:sig + sia:sat + sia:slp +sia:v10 + sig:sat + sig:slp + sig:v10 + sat:slp + sat:v10 + slp:v10, data=reg2_norm)
+Mod2 <- step(fin_fit2)
+summary(Mod2)
+
+#test for normality
+shapiro.test(Mod2$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod2)
+#test for heteroskedasticity
+bptest(Mod2)
+#Plots
+qqPlot(Mod2$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod2)
+ols_plot_resid_fit(Mod2)
+ols_plot_resid_stand(Mod2)
+ols_plot_resid_lev(Mod2)
+
+Mod2_final <- lm(sit ~ sat + sia:sig + sia:slp + slp:v10, data=reg2_norm)
+Mod2_final <- lm(sit ~ sat + sia:sig + sia:slp , data=reg2_norm)
+summary(Mod2_final)
+#test for normality
+shapiro.test(Mod2_final$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod2_final)
+#test for heteroskedasticity
+bptest(Mod2_final)
+#Plots
+qqPlot(Mod2_final$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod2_final)
+ols_plot_resid_fit(Mod2_final)
+ols_plot_resid_stand(Mod2_final)
+ols_plot_resid_lev(Mod2_final)
+```
+```{r mclin3}
+fit3_prelim <- lm(sit~.-yrs, data=reg3_norm)
+omcdiag(fit3_prelim)
+imcdiag(fit3_prelim)
+fit3_prelim2 <- lm(sit~ sia + sig + sat +slp + v10 , data=reg3_norm)
+omcdiag(fit3_prelim2)
+imcdiag(fit3_prelim2)
+fin_fit3 <- lm(sit ~ sia + sig + sat + slp + v10 + sia:sig + sia:sat + sia:slp + sia:v10 + sig:sat + sig: slp + sig:v10 + sat:slp + sat:v10 + slp:v10, data = reg3_norm)
+Mod3 <- step(fin_fit3)
+summary(Mod3)
+#test for normality
+shapiro.test(Mod3$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod3)
+#test for heteroskedasticity
+bptest(Mod3)
+#Plots
+qqPlot(Mod3$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod3)
+ols_plot_resid_fit(Mod3)
+ols_plot_resid_stand(Mod3)
+ols_plot_resid_lev(Mod3)
+
+Mod3_final <- lm(sit~ sig+slp+sia:slp+sia:v10+sat:v10,data=reg3_norm)
+Mod3_final <- lm(sit~ slp,data=reg3_norm)
+summary(Mod3_final)
+#test for normality
+shapiro.test(Mod3_final$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod3_final)
+#test for heteroskedasticity
+bptest(Mod3_final)
+#Plots
+qqPlot(Mod3_final$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-3,3), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod3_final)
+ols_plot_resid_fit(Mod3_final)
+ols_plot_resid_stand(Mod3_final)
+ols_plot_resid_lev(Mod3_final)
+```
+```{r mclin4}
+fit4_prelim <- lm(sit~.-yrs, data=reg4_norm)
+omcdiag(fit4_prelim)
+imcdiag(fit4_prelim)
+fin_fit4 <- lm(sit~ sia + sig +sat +slp +u10 + v10 + sia:sig + sia:sat + sia:slp +sia:u10 + sia:v10 + sig:sat + sig:slp + sig:u10 + sig:v10 + sat:slp + sat:u10 + sat:v10 + slp:u10 +slp:v10 + u10:v10, data=reg4_norm) 
+Mod4 <- step(fin_fit4)
+summary(Mod4)
+
+#test for normality
+shapiro.test(Mod4$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod4)
+#test for heteroskedasticity
+bptest(Mod4)
+#Plots
+qqPlot(Mod4$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod4)
+ols_plot_resid_fit(Mod4)
+ols_plot_resid_stand(Mod4)
+ols_plot_resid_lev(Mod4)
+
+reduced_Mod4_final <- lm(sit~ sia + sat +slp + u10+sia:slp+sia:u10+sia:v10 + sig:sat + sat:slp +sat:u10 + slp:v10, data=reg4_norm)
+reduced_Mod4_final <- lm(sit~ sat +slp + sia:u10+sia:v10 + sig:sat, data=reg4_norm)
+reduced_Mod4_final <- lm(sit~ sat +slp, data=reg4_norm)
+summary(reduced_Mod4_final)
+
+#test for normality
+shapiro.test(reduced_Mod4_final$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(reduced_Mod4_final)
+#test for heteroskedasticity
+bptest(reduced_Mod4_final)
+#Plots
+qqPlot(reduced_Mod4_final$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-1.5,1.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(reduced_Mod4_final)
+ols_plot_resid_fit(reduced_Mod4_final)
+ols_plot_resid_stand(reduced_Mod4_final)
+ols_plot_resid_lev(reduced_Mod4_final)
+```
+
+```{r mclin5}
+fit5_prelim <- lm(sit~.-yrs, data=reg5_norm)
+omcdiag(fit5_prelim)
+imcdiag(fit5_prelim)
+fit5_prelim2 <- lm(sit~ sia + sig + sat +slp + v10 , data=reg5_norm)
+omcdiag(fit5_prelim2)
+imcdiag(fit5_prelim2)
+fit5_prelim3 <- lm(sit~ sia  + sat +slp + v10 , data=reg5_norm)
+omcdiag(fit5_prelim3)
+imcdiag(fit5_prelim3)
+fin_fit5 <- lm(sit ~ sia + sat + slp + v10 + sia:sat + sia:slp + sia:v10 + sat:slp + sat:v10 + slp:v10, data=reg5_norm)
+Mod5 <- step(fin_fit5)
+summary(Mod5)
+
+#test for normality
+shapiro.test(Mod5$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod5)
+#test for heteroskedasticity
+bptest(Mod5)
+#Plots
+qqPlot(Mod5$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod5)
+ols_plot_resid_fit(Mod5)
+ols_plot_resid_stand(Mod5)
+ols_plot_resid_lev(Mod5)
+
+Mod5_final <- lm(sit~sat, data=reg5_norm)
+summary(Mod5_final)
+
+#test for normality
+shapiro.test(Mod5_fix$resid)
+#correlation between observed residuals and expected residuals under normality
+ols_test_correlation(Mod5_final)
+#test for heteroskedasticity
+bptest(Mod5_final)
+#Plots
+qqPlot(Mod5_final$resid, ylab="Residuals", xlab="Theoretical Quantiles", ylim=c(-2.5,2.5), main="Normal Q-Q Plot")
+ols_plot_resid_hist(Mod5_final)
+ols_plot_resid_fit(Mod5_final)
+ols_plot_resid_stand(Mod5_final)
+ols_plot_resid_lev(Mod5_final)
+
+ggplot(reg5_norm,aes(y=sit,x=sat))+geom_point()+geom_smooth(method="lm")+labs(title="Linear Model")
+```
+
+Normality of residuals: QQ plot
+Homogeneity of variance: Scale-location plot
+Linearity of data: Residuals v. fitted plot
+
+Test for error normality (i.e. QQ plot residual normality): 
